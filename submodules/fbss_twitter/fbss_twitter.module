@@ -1,0 +1,211 @@
+<?php
+
+/**
+ * @file
+ *   Provides Twitter integration with FBSS.
+ */
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function fbss_twitter_form_facebook_status_box_alter(&$form, &$form_state) {
+  if ($form_state['facebook_status']['recipient'] != $GLOBALS['user']->uid || $form_state['facebook_status']['type'] != 'user') {
+    return;
+  }
+  $context = facebook_status_determine_context($form_state['facebook_status']['type']);
+  $recipient = $context['handler']->load_recipient($form_state['facebook_status']['recipient']);
+  $data = $recipient->data;
+  if (is_string($data)) {
+    $data = unserialize($data);
+  }
+  if ($data['fbss_twitter_account'] && variable_get('fbss_twitter_default', 'off') != 'disallow') {
+    $form['twitter'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Post to Twitter'),
+      '#default_value' => _fbss_twitter_get_default($recipient),
+      '#weight' => -30,
+    );
+  }
+  $form_state['submit'][] = 'fbss_twitter_facebook_status_box_submit';
+}
+
+/**
+ * A submit function for the status update form.
+ */
+function fbss_twitter_facebook_status_box_submit(&$form, &$form_state) {
+  $new_status = trim($form_state['values']['fbss-status']);
+  $default = $form_state['values']['sdefault'];
+  // Don't tweet the status if it wasn't changed from the default.
+  if ($new_status != $default) {
+    if (!empty($form_state['values']['twitter'])) {
+      $sid = NULL;
+      if (isset($form_state['facebook_status']['sid'])) {
+        $sid = $form_state['facebook_status']['sid'];
+      }
+      fbss_twitter_post_to_twitter($account, $new_status, $sid);
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * No need to check permissions since the form is already restricted.
+ */
+function fbss_twitter_form_twitter_account_list_form_alter(&$form, &$form_state) {
+  $account = _facebook_status_user_load(arg(1));
+  if (!user_access('update and view own stream', $account)) {
+    return;
+  }
+  $result = db_query("SELECT screen_name FROM {twitter_account} WHERE uid = :uid", array(':uid' => arg(1)));
+  $options = array(0 => t('None'));
+  while ($option = db_fetch_array($result)) {
+    $options[$option['screen_name']] = $option['screen_name'];
+  }
+  $data = unserialize($account->data);
+
+  $default_setting = variable_get('fbss_twitter_default', 'off');
+  if (count($options) > 1 && $default_setting != 'disallow') {
+    if ($default_setting == 'on-user' || $default_setting == 'off-user') {
+      if (!isset($data['fbss_twitter_default'])) {
+        $data['fbss_twitter_default'] = 0;
+        if ($default_setting == 'on-user') {
+          $data['fbss_twitter_default'] = 1;
+        }
+      }
+      $form['fbss_twitter_default'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Enable "Post to Twitter" checkbox for status updates by default'),
+        '#default_value' => $data['fbss_twitter_default'],
+        '#weight' => -1,
+      );
+    }
+    $form_state['#account'] = $account;
+    $form['fbss_twitter_account'] = array(
+      '#type' => 'select',
+      '#title' => t('Choose an account to which status updates can be posted'),
+      '#description' => t('If you choose a Twitter account here, you will be given the option to post your status updates to Twitter on the status update form.'),
+      '#default_value' => $data['fbss_twitter_account'],
+      '#options' => $options,
+      '#weight' => -1,
+    );
+    $form['#submit'][] = 'fbss_twitter_twitter_submit';
+  }
+}
+
+/**
+ * Submit function for the Twitter account form alter.
+ */
+function fbss_twitter_twitter_submit($form, &$form_state) {
+  $account = $form_state['#account'];
+  if (!empty($account)) {
+    user_save($account, array(
+      'fbss_twitter' => $form_state['values']['fbss_twitter_account'],
+      'fbss_twitter_default' => $form_state['values']['fbss_twitter_default'],
+    ), 'twitter');
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * @todo: Make this its own page
+ */
+function fbss_twitter_form_facebook_status_admin_alter(&$form, &$form_state) {
+  $form['fbss_twitter_default'] = array(
+    '#type' => 'radios',
+    '#title' => t('Default Twitter option'),
+    '#default_value' => variable_get('fbss_twitter_default', 'off'),
+    '#required' => TRUE,
+    '#options' => array(
+      'on' => t('Always enabled by default'),
+      'off' => t('Always disabled by default'),
+      'on-user' => t('Let the user choose (enabled is default)'),
+      'off-user' => t('Let the user choose (disabled is default)'),
+      'disallow' => t('Do not allow posting to Twitter at all'),
+    ),
+    '#weight' => -70,
+  );
+  $form['#validate'][] = 'fbss_twitter_settings_validate';
+}
+
+/**
+ * Validate function for the Facebook-style Statuses settings form alter.
+ */
+function fbss_twitter_settings_validate(&$form, &$form_state) {
+  if ($form_state['values']['facebook_status_length'] > 140 && variable_get('fbss_twitter_default', 'off') != 'disallow') {
+    drupal_set_message(t('The maximum number of characters allowed in a status is set to a number above 140, and users can post status updates to Twitter.') . ' ' .
+      t('These settings could allow users to attempt to post messages to Twitter which are too long for Twitter to handle.') . ' ' .
+      t('In this situation, Facebook-style Statuses will attempt to truncate the tweet and include a link to view the full message on your site.') . ' ' .
+      t('Occasionally it is not possible to get a link to the status message, in which case the tweet will simply be shortened to 140 characters by Twitter.'),
+      'warning');
+  }
+}
+
+/**
+ * Posts a status to Twitter.
+ *
+ * @param $account
+ *   The $user object for the user posting the tweet.
+ * @param $message
+ *   The text of the message being posted.
+ * @param $sid
+ *   (optional) If the message is too long to fit in a tweet and a SID is
+ *   given, the tweet will be truncated and a link to view the whole status
+ *   message will be appended. If the message is too long and a SID is not
+ *   given, Twitter will simply truncate the message on its own.
+ */
+function fbss_twitter_post_to_twitter($account, $message, $sid = NULL) {
+  if (empty($message)) {
+    return;
+  }
+  global $user;
+  if ($user->uid != $account->uid) {
+    return;
+  }
+  // Try to fit the message into a tweet.
+  if (!empty($sid) && drupal_strlen($message) > 140) {
+    $url = url('statuses/' . $sid);
+    if (module_exists('shorten')) {
+      $url = shorten_url($url);
+    }
+    $url_length = drupal_strlen($url);
+    $message = drupal_substr($message, 0, 138 - $url_length) . "\xE2\x80\xA6 " . $url;
+  }
+  module_load_include('inc', 'twitter');
+  $twitter_accounts = twitter_get_user_accounts($account->uid);
+  $data = unserialize($account->data);
+  foreach ($twitter_accounts as $twitter_account_available) {
+    if ($twitter_account_available->screen_name == $data['fbss_twitter_account']) {
+      twitter_set_status($twitter_account_available, $message);
+      break;
+    }
+  }
+}
+
+/**
+ * Gets the default value for the "Post to Twitter" checkbox on the status
+ * update form.
+ *
+ * @param $account
+ *   The user account object for the user whose checkbox will be displayed.
+ * @return
+ *   The default value for the checkbox (1 or 0).
+ */
+function _fbss_twitter_get_default($account) {
+  $data = unserialize($account->data);
+  $default_setting = variable_get('fbss_twitter_default', 'off');
+  $return = 0;
+  if ($default_setting == 'on-user' || $default_setting == 'on') {
+    $return = 1;
+  }
+  if (($default_setting == 'on-user' || $default_setting == 'off-user') && isset($data['fbss_twitter_default'])) {
+    return $data['fbss_twitter_default'];
+  }
+  return $return;
+}
+
+/**
+ * Implements hook_facebook_status_form_ahah_alter().
+ */
+function fbss_twitter_facebook_status_form_ahah_alter(&$new_form, $form) {
+  $new_form['twitter'] = $form['twitter'];
+}

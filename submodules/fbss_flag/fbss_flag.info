@@ -1,0 +1,9 @@
+name = Facebook-style Statuses Flags
+description = "Integrates Flag with Facebook-style Statuses."
+package = Facebook-style Statuses
+dependencies[] = facebook_status
+dependencies[] = flag
+core = 7.x
+files[] = fbss_flag.flag.inc
+files[] = fbss_flag.install
+files[] = fbss_flag.module

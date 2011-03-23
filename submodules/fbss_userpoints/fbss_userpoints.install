@@ -1,0 +1,15 @@
+<?php
+
+/**
+ * @file
+ *   (Un)installs the Facebook-style Statuses Userpoints module.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function fbss_userpoints_uninstall() {
+  variable_del('facebook_status_userpoints_other');
+  variable_del('facebook_status_userpoints_max');
+  variable_del('facebook_status_userpoints_own');
+}
