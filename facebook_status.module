@@ -311,17 +311,13 @@ function facebook_status_user_view($account, $view_mode) {
     );
     $account->content['facebook_status']['status'] = array(
       '#type' => 'user_profile_item',
-      '#title' => '',
-      '#value' => $value,
+      '#title' => 'Statuses',
+      '#markup' => $value,
       '#attributes' => array('class' => 'facebook-status profile'),
     );
   }
 }
 
-/**
- * Implements hook_user().
- */
-function facebook_status_user_OLD($op, &$edit, &$account, $category = NULL) { }
 
 /**
  * Implements hook_init().
@@ -791,13 +787,13 @@ function facebook_status_save_status($recipient, $type, $message, $sender = NULL
       // TODO Please review the conversion of this statement to the D7 database API syntax.
       /* db_query($sql, $message, $time, $status->sid) */
       db_update('facebook_status')
-			  ->fields(array(
-			        'message' => $message,
-			        'created' => $time,
-			      ))
-			  ->condition('sid', $status->sid)
-			  ->condition('ORDER BY sid DESC', '')
-			  ->execute();
+        ->fields(array(
+          'message' => $message,
+          'created' => $time,
+        ))
+        ->condition('sid', $status->sid)
+        ->condition('ORDER BY sid DESC', '')
+        ->execute();
       $object->sid = $status->sid;
       $edit = TRUE;
     }
@@ -1077,7 +1073,7 @@ function facebook_status_token_values($type, $data = NULL, $options = array()) {
     $edit = '<span class="facebook-status-edit-link facebook-status-action-link">' . l(t('Edit'), 'statuses/' . $status->sid . '/edit') . '</span>';
   }
   if (facebook_status_user_access('delete', $status)) {
-    $delete = '<span class="facebook-status-delete-link facebook-status-action-link">' .  l(t('Delete'), 'statuses/' . $status->sid . '/delete') . '</span>';
+    $delete = '<span class="facebook-status-delete-link facebook-status-action-link">' . l(t('Delete'), 'statuses/' . $status->sid . '/delete') . '</span>';
   }
   $sender = _facebook_status_user_load($status->sender);
   $recipient = $context['handler']->load_recipient($status->recipient);
