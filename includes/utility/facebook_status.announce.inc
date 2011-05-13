@@ -8,7 +8,7 @@
 /**
  * Admin form callback.
  */
-function facebook_status_announce_admin(&$form_state) {
+function facebook_status_announce_admin($form, &$form_state) {
   $form = array();
   $form['info'] = array(
     '#value' => t('Warning: this can be very slow on sites with lots of users.'),
