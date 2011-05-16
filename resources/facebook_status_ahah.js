@@ -1,19 +1,22 @@
 // Mostly copied from the AHAH Helper module.
 (function($) {
 
-if (Drupal.jsEnabled) {
+//if (Drupal.jsEnabled) {
   $(document).ready(function() {
-    if (Drupal.ahah != undefined) {
+    //if (Drupal.ahah != undefined) {
 
 /**
  * Override of Drupal.ahah.prototype.success to allow for new Drupal.settings.
  */
-Drupal.ahah.prototype.success = function (response, status) {
+//Drupal.ahah.prototype.success = function (response, status) {
+  Drupal.behaviors.facebook_status = {
+    attach: function(context, settings) {
   var wrapper = $(this.wrapper);
   var form = $(this.element).parents('form');
   // Manually insert HTML into the jQuery object. Using $() directly crashes
   // Safari with long string lengths. http://dev.jquery.com/ticket/1152
-  var new_content = $('<div></div>').html(response.data);
+  //var new_content = $('<div></div>').html(response.data);
+  var new_content = $('<div></div>').html(settings.data);
 
   // Restore the previous action and target to the form.
   form.attr('action', this.form_action);
@@ -59,8 +62,9 @@ Drupal.ahah.prototype.success = function (response, status) {
   }
 
   // Merge in new and changed settings, if any.
-  if (response.settings) {
-    $.extend(Drupal.settings, response.settings);
+  if (settings) {
+    //$.extend(Drupal.settings, response.settings);
+    $.extend(Drupal.settings, settings);
   }
 
   //Let other processes react to the update.
@@ -70,14 +74,17 @@ Drupal.ahah.prototype.success = function (response, status) {
   // successfully added to the page, this if() statement allows #ahah[wrapper]
   // to be optional.
   if (new_content.parents('html').length > 0) {
+    //Drupal.attachBehaviors(new_content, settings);
     Drupal.attachBehaviors(new_content);
   }
 
   Drupal.unfreezeHeight();
+  
+  } // added
 };
 
-    }
+    //}
   });
-}
+//}
 
 })(jQuery);

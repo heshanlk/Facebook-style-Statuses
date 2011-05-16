@@ -275,10 +275,10 @@ function facebook_status_user_cancel($edit, $account, $method) {
   if (TRUE) {
     // Remove abandoned statuses from the database on user account deletion.
     // TODO Please review the conversion of this statement to the D7 database API syntax.
-    /* db_query("DELETE FROM {facebook_status} WHERE sender = %d OR (recipient = %d AND type = 'user')", $account->uid, $account->uid) */
-    db_delete('facebook_status')
-    ->where('sender = %d OR (recipient = %d AND type = ' user ')',  )
-  ->execute();
+    db_query("DELETE FROM {facebook_status} WHERE sender = :uid OR (recipient = :uid AND type = 'user')", array($account->uid));
+    /*db_delete('facebook_status')
+      ->where('sender = %d OR (recipient = %d AND type = ' user ')'  )
+      ->execute();*/
     // NOTE: modules that integrate with FBSS should implement hook_user()
     // themselves instead of relying on hook_facebook_status_delete().
     // Administrators who use the interface to create actions that occur when a
@@ -311,17 +311,13 @@ function facebook_status_user_view($account, $view_mode) {
     );
     $account->content['facebook_status']['status'] = array(
       '#type' => 'user_profile_item',
-      '#title' => '',
-      '#value' => $value,
+      '#title' => 'Statuses',
+      '#markup' => $value,
       '#attributes' => array('class' => 'facebook-status profile'),
     );
   }
 }
 
-/**
- * Implements hook_user().
- */
-function facebook_status_user_OLD($op, &$edit, &$account, $category = NULL) { }
 
 /**
  * Implements hook_init().
@@ -692,7 +688,7 @@ function facebook_status_all_contexts() {
   }
   $result = db_query("SELECT * FROM {facebook_status_contexts}");
   $contexts = module_invoke_all('facebook_status_context_info');
-  while ($c = db_fetch_array($result)) {
+  while ($c = $result->fetchAssoc()) {
     $contexts[$c['type']]['in_db'] = TRUE;
     $contexts[$c['type']]['weight'] = $c['weight'];
     $contexts[$c['type']]['view'] = $c['view'];
@@ -730,8 +726,8 @@ function facebook_status_delete_status($sid) {
   // TODO Please review the conversion of this statement to the D7 database API syntax.
   /* db_query("DELETE FROM {facebook_status} WHERE sid = %d", $sid) */
   db_delete('facebook_status')
-  ->condition('sid', $sid)
-  ->execute();
+    ->condition('sid', $sid)
+    ->execute();
 }
 
 /**
@@ -791,13 +787,13 @@ function facebook_status_save_status($recipient, $type, $message, $sender = NULL
       // TODO Please review the conversion of this statement to the D7 database API syntax.
       /* db_query($sql, $message, $time, $status->sid) */
       db_update('facebook_status')
-  ->fields(array(
-        'message' => $message,
-        'created' => $time,
-      ))
-  ->condition('sid', $status->sid)
-  ->condition('DER BY sid DESC', '')
-  ->execute();
+        ->fields(array(
+          'message' => $message,
+          'created' => $time,
+        ))
+        ->condition('sid', $status->sid)
+        ->condition('ORDER BY sid DESC', '')
+        ->execute();
       $object->sid = $status->sid;
       $edit = TRUE;
     }
@@ -1077,7 +1073,7 @@ function facebook_status_token_values($type, $data = NULL, $options = array()) {
     $edit = '<span class="facebook-status-edit-link facebook-status-action-link">' . l(t('Edit'), 'statuses/' . $status->sid . '/edit') . '</span>';
   }
   if (facebook_status_user_access('delete', $status)) {
-    $delete = '<span class="facebook-status-delete-link facebook-status-action-link">' .  l(t('Delete'), 'statuses/' . $status->sid . '/delete') . '</span>';
+    $delete = '<span class="facebook-status-delete-link facebook-status-action-link">' . l(t('Delete'), 'statuses/' . $status->sid . '/delete') . '</span>';
   }
   $sender = _facebook_status_user_load($status->sender);
   $recipient = $context['handler']->load_recipient($status->recipient);
@@ -1115,7 +1111,7 @@ function facebook_status_token_values($type, $data = NULL, $options = array()) {
  */
 function facebook_status_views_api() {
   return array(
-    'api' => 2,
+    'api' => 3,
     'path' => drupal_get_path('module', 'facebook_status') . '/includes/views',
   );
 }

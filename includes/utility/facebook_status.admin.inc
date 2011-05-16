@@ -44,7 +44,7 @@ function facebook_status_admin($form_state) {
   $views = views_get_all_views();
   $list = array('' => t('None'));
   foreach ($views as $name => $view) {
-    if ($view->disabled == 0) {
+    if (isset($view->disabled) == 0) {
       $list[$name] = $name;
     }
   }
@@ -185,7 +185,8 @@ function facebook_status_admin_contexts(&$form_state) {
   foreach ($data as $type => $values) {
     $form['components'][$type]['title'] = array(
       '#prefix' => '<div title="' . (isset($values['description']) ? $values['description'] : '') . '">',
-      '#value' => $values['title'],
+      //'#value' => $values['title'],
+      '#markup' => $values['title'],
       '#suffix' => '</div>',
     );
     $form['components'][$type]['view'] = array(
@@ -209,7 +210,8 @@ function facebook_status_admin_contexts(&$form_state) {
     );
     $form['components'][$type]['already_saved'] = array(
       '#type' => 'hidden',
-      '#value' => isset($values['in_db']) ? $values['in_db'] : FALSE,
+      //'#value' => isset($values['in_db']) ? $values['in_db'] : FALSE,
+      '#markup' => isset($values['in_db']) ? $values['in_db'] : FALSE,
     );
   }
   $form['submit'] = array(
